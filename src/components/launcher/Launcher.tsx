@@ -97,7 +97,7 @@ export default function LauncherPage() {
           </span>
 
           <h1 className="font-roboto-slab text-4xl sm:text-6xl text-red-400 leading-tight mt-4">
-            Let's go <br /> back to school
+            Let&apos;s go <br /> back to school
           </h1>
 
           <div className="max-w-md">

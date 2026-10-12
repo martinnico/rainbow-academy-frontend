@@ -1,5 +1,3 @@
-import { NavBar } from "@/components";
-import Footer from "@/components/layout/Footer";
 import Link from "next/link";
 
 const levels = [

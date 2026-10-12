@@ -1,34 +1,4 @@
-// ============================================================
-// Ebook Data — Content, chapters, and comprehension questions
-// ============================================================
-
-export interface ComprehensionQuestion {
-  question: string;
-  options: string[];
-  correctIndex: number;
-}
-
-export interface Chapter {
-  id: string;
-  title: string;
-  content: string;
-  questions: ComprehensionQuestion[];
-}
-
-export interface EbookData {
-  id: string;
-  title: string;
-  subtitle: string;
-  tag: string;
-  level: string;
-  price: string;
-  description: string;
-  color: string;
-  bgLight: string;
-  textColor: string;
-  pages: number;
-  chapters: Chapter[];
-}
+import type { EbookData } from "@/types/ebook";
 
 export const ebooksData: EbookData[] = [
   {
@@ -90,7 +60,7 @@ When you want to tell someone your name, you can say:
 | I'm fine | Estoy bien |`,
         questions: [
           {
-            question: '¿Cuál es el saludo más común en inglés?',
+            question: "¿Cuál es el saludo más común en inglés?",
             options: ["Good night", "Hello / Hi", "See you", "Goodbye"],
             correctIndex: 1,
           },
@@ -105,7 +75,7 @@ When you want to tell someone your name, you can say:
             correctIndex: 1,
           },
           {
-            question: '¿Qué responde Ben cuando Anna se presenta?',
+            question: "¿Qué responde Ben cuando Anna se presenta?",
             options: [
               "Goodbye, Anna",
               "I'm Ben. Nice to meet you!",
@@ -167,7 +137,7 @@ Colors are adjectives that describe the appearance of objects. The basic colors 
 - "What number is this?" — *¿Qué número es este?*`,
         questions: [
           {
-            question: '¿Cómo se dice el número 15 en inglés?',
+            question: "¿Cómo se dice el número 15 en inglés?",
             options: ["Fiveteen", "Fifteen", "Fifthteen", "Fifty"],
             correctIndex: 1,
           },
@@ -227,12 +197,12 @@ Some letters sound similar and can be confusing:
 **Tip:** Practice saying the alphabet out loud every day until you feel comfortable!`,
         questions: [
           {
-            question: '¿Cuántas letras tiene el alfabeto inglés?',
+            question: "¿Cuántas letras tiene el alfabeto inglés?",
             options: ["24", "25", "26", "27"],
             correctIndex: 2,
           },
           {
-            question: '¿Cuántas vocales hay en el alfabeto inglés?',
+            question: "¿Cuántas vocales hay en el alfabeto inglés?",
             options: ["4", "5", "6", "7"],
             correctIndex: 1,
           },
@@ -327,7 +297,7 @@ When the waiter comes to take your order:
             correctIndex: 1,
           },
           {
-            question: '¿Cómo se pide la cuenta en inglés?',
+            question: "¿Cómo se pide la cuenta en inglés?",
             options: [
               "I'd like the chicken",
               "Can I have the bill?",
@@ -481,7 +451,7 @@ Being able to ask for and give directions is very important when traveling or li
             correctIndex: 2,
           },
           {
-            question: 'En el diálogo, ¿dónde está el museo?',
+            question: "En el diálogo, ¿dónde está el museo?",
             options: [
               "A la izquierda, al lado de la biblioteca",
               "A la derecha, detrás de la biblioteca",
@@ -557,12 +527,7 @@ Idioms should be used in **informal** conversations. In formal writing (academic
         questions: [
           {
             question: '"A piece of cake" significa que algo es:',
-            options: [
-              "Delicioso",
-              "Muy fácil",
-              "Muy caro",
-              "Muy raro",
-            ],
+            options: ["Delicioso", "Muy fácil", "Muy caro", "Muy raro"],
             correctIndex: 1,
           },
           {
@@ -576,7 +541,7 @@ Idioms should be used in **informal** conversations. In formal writing (academic
             correctIndex: 1,
           },
           {
-            question: '¿Dónde NO deberías usar idioms?',
+            question: "¿Dónde NO deberías usar idioms?",
             options: [
               "En conversaciones casuales",
               "Con amigos",
@@ -662,7 +627,12 @@ Idioms should be used in **informal** conversations. In formal writing (academic
           },
           {
             question: '"Give up" se traduce como:',
-            options: ["Dar más", "Devolver", "Rendirse o dejar un hábito", "Regalar"],
+            options: [
+              "Dar más",
+              "Devolver",
+              "Rendirse o dejar un hábito",
+              "Regalar",
+            ],
             correctIndex: 2,
           },
         ],
@@ -740,7 +710,7 @@ When writing, try to use at least 3-4 different connectors. This shows variety a
             correctIndex: 2,
           },
           {
-            question: '¿Cuál de estos es un conector de conclusión?',
+            question: "¿Cuál de estos es un conector de conclusión?",
             options: ["Furthermore", "Meanwhile", "In summary", "Because"],
             correctIndex: 2,
           },
@@ -998,8 +968,7 @@ For **wh-questions**, keep the question word:
 > **Reported:** The teacher said that we had to study for the test.`,
         questions: [
           {
-            question:
-              'En reported speech, "I am happy" se convierte en:',
+            question: 'En reported speech, "I am happy" se convierte en:',
             options: [
               "She said she is happy",
               "She said she was happy",
@@ -1009,8 +978,7 @@ For **wh-questions**, keep the question word:
             correctIndex: 1,
           },
           {
-            question:
-              '¿Cuál es la diferencia entre "said" y "told"?',
+            question: '¿Cuál es la diferencia entre "said" y "told"?',
             options: [
               "Son exactamente iguales",
               '"told" siempre necesita una persona (told me, told her)',
@@ -1020,14 +988,8 @@ For **wh-questions**, keep the question word:
             correctIndex: 1,
           },
           {
-            question:
-              'Para reportar una pregunta de sí/no, usamos:',
-            options: [
-              "What o where",
-              "If o whether",
-              "That",
-              "Because",
-            ],
+            question: "Para reportar una pregunta de sí/no, usamos:",
+            options: ["What o where", "If o whether", "That", "Because"],
             correctIndex: 1,
           },
         ],

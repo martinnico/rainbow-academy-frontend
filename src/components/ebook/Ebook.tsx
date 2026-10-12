@@ -1,41 +1,5 @@
 import Link from "next/link";
 
-const levels = [
-  {
-    id: "beginner",
-    label: "Beginner",
-    color: "#8DC87A",
-    bgLight: "#EAF5E5",
-    textColor: "#3B6D11",
-    title: "Primeros pasos",
-    desc: "Vocabulario esencial, pronunciación y estructuras básicas...",
-    modules: ["Saludos", "Presente", "Vocabulario"],
-    price: "$2.500",
-  },
-  {
-    id: "intermediate",
-    label: "Intermediate",
-    color: "#7AAEE8",
-    bgLight: "#E6F1FB",
-    textColor: "#185FA5",
-    title: "Tomando vuelo",
-    desc: "Tiempos verbales complejos, conversación fluida...",
-    modules: ["Past & Future", "Reading", "Expresión"],
-    price: "$3.000",
-  },
-  {
-    id: "advanced",
-    label: "Advanced",
-    color: "#9B7AE8",
-    bgLight: "#EEEDFE",
-    textColor: "#534AB7",
-    title: "Fluidez total",
-    desc: "Inglés académico y profesional, escritura avanzada...",
-    modules: ["Business English", "Escritura", "Certificaciones"],
-    price: "$3.500",
-  },
-];
-
 const ebookProducts = [
   {
     id: "ebook-a1",

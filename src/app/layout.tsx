@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Playfair_Display, DM_Sans, Geist, Cinzel } from "next/font/google";
 import "./globals.css";
-import { cn } from "@/lib/utils";
+import { cn } from "@/services/utils";
 import { NavBar, Footer } from "@/components";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });

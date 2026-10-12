@@ -1,4 +1,4 @@
-import Ebook from "@/components/foreigns/ebook/Ebook";
+import Ebook from "@/components/ebook/Ebook";
 
 export default function Page() {
   return (

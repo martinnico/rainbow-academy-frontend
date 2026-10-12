@@ -1,52 +1,4 @@
-// ============================================================
-// Game Data — Organized by Level → Module → Activity
-// ============================================================
-
-export interface QuizQuestion {
-  question: string;
-  options: string[];
-  correctIndex: number;
-  explanation?: string;
-}
-
-export interface WordSearchData {
-  words: { word: string; translation: string }[];
-  gridSize: number;
-}
-
-export interface PictureMatchItem {
-  word: string;
-  correctEmoji: string;
-  options: string[];
-}
-
-export interface SituationItem {
-  sentence: string;
-  translation: string;
-  options: string[];
-  correctIndex: number;
-}
-
-export interface ModuleData {
-  id: string;
-  name: string;
-  description: string;
-  quiz: QuizQuestion[];
-  wordSearch: WordSearchData;
-  pictureMatch: PictureMatchItem[];
-  situations: SituationItem[];
-}
-
-export interface LevelData {
-  id: string;
-  label: string;
-  title: string;
-  description: string;
-  color: string;
-  bgLight: string;
-  textColor: string;
-  modules: ModuleData[];
-}
+import type { LevelData } from "@/types/game";
 
 export const levelsData: LevelData[] = [
   {
@@ -69,7 +21,8 @@ export const levelsData: LevelData[] = [
             question: '¿Qué significa "Hello"?',
             options: ["Adiós", "Hola", "Gracias", "Por favor"],
             correctIndex: 1,
-            explanation: '"Hello" es la forma más común de decir "Hola" en inglés.',
+            explanation:
+              '"Hello" es la forma más común de decir "Hola" en inglés.',
           },
           {
             question: '¿Cómo se dice "¿Cómo estás?" en inglés?',
@@ -98,7 +51,12 @@ export const levelsData: LevelData[] = [
           },
           {
             question: '¿Qué significa "See you later"?',
-            options: ["Mucho gusto", "Hasta luego", "Buenos días", "Bienvenido"],
+            options: [
+              "Mucho gusto",
+              "Hasta luego",
+              "Buenos días",
+              "Bienvenido",
+            ],
             correctIndex: 1,
           },
           {
@@ -224,7 +182,8 @@ export const levelsData: LevelData[] = [
           "Dominá el presente simple para hablar de rutinas y hábitos diarios.",
         quiz: [
           {
-            question: '¿Cuál es la forma correcta? "She ___ to school every day."',
+            question:
+              '¿Cuál es la forma correcta? "She ___ to school every day."',
             options: ["go", "goes", "going", "gone"],
             correctIndex: 1,
             explanation:
@@ -321,7 +280,8 @@ export const levelsData: LevelData[] = [
         ],
         situations: [
           {
-            sentence: "I wake up at 6 AM every day. Then I take a shower and have breakfast.",
+            sentence:
+              "I wake up at 6 AM every day. Then I take a shower and have breakfast.",
             translation:
               "Me despierto a las 6 AM todos los días. Luego me ducho y desayuno.",
             options: [
@@ -333,7 +293,8 @@ export const levelsData: LevelData[] = [
             correctIndex: 1,
           },
           {
-            sentence: "She doesn't eat meat. She prefers vegetables and fruits.",
+            sentence:
+              "She doesn't eat meat. She prefers vegetables and fruits.",
             translation: "Ella no come carne. Prefiere verduras y frutas.",
             options: [
               "Alguien habla de la dieta de una mujer vegetariana",
@@ -476,8 +437,7 @@ export const levelsData: LevelData[] = [
           },
           {
             sentence: "I need to buy some bread and milk from the store.",
-            translation:
-              "Necesito comprar algo de pan y leche en la tienda.",
+            translation: "Necesito comprar algo de pan y leche en la tienda.",
             options: [
               "Alguien está cocinando en su casa",
               "Alguien necesita ir a comprar al supermercado",
@@ -488,8 +448,7 @@ export const levelsData: LevelData[] = [
           },
           {
             sentence: "The weather is beautiful today. Let's go to the park!",
-            translation:
-              "El clima está hermoso hoy. ¡Vamos al parque!",
+            translation: "El clima está hermoso hoy. ¡Vamos al parque!",
             options: [
               "Alguien se queja de la lluvia",
               "Alguien quiere quedarse en casa",
@@ -500,8 +459,7 @@ export const levelsData: LevelData[] = [
           },
           {
             sentence: "My phone is on the table next to the chair.",
-            translation:
-              "Mi teléfono está sobre la mesa al lado de la silla.",
+            translation: "Mi teléfono está sobre la mesa al lado de la silla.",
             options: [
               "Alguien perdió su teléfono",
               "Alguien describe dónde está su teléfono",
@@ -572,7 +530,12 @@ export const levelsData: LevelData[] = [
           },
           {
             question: '"Did you eat breakfast?" es una pregunta en:',
-            options: ["Presente simple", "Pasado simple", "Futuro", "Presente perfecto"],
+            options: [
+              "Presente simple",
+              "Pasado simple",
+              "Futuro",
+              "Presente perfecto",
+            ],
             correctIndex: 1,
           },
           {
@@ -627,8 +590,7 @@ export const levelsData: LevelData[] = [
         situations: [
           {
             sentence: "I went to the beach last summer and it was amazing!",
-            translation:
-              "Fui a la playa el verano pasado y fue increíble!",
+            translation: "Fui a la playa el verano pasado y fue increíble!",
             options: [
               "Alguien planea ir a la playa este verano",
               "Alguien cuenta una experiencia pasada en la playa",
@@ -651,8 +613,7 @@ export const levelsData: LevelData[] = [
           },
           {
             sentence: "Did you finish your homework before dinner?",
-            translation:
-              "¿Terminaste tu tarea antes de la cena?",
+            translation: "¿Terminaste tu tarea antes de la cena?",
             options: [
               "Un padre pregunta si la tarea ya fue completada",
               "Un profesor asigna tarea nueva",
@@ -662,7 +623,8 @@ export const levelsData: LevelData[] = [
             correctIndex: 0,
           },
           {
-            sentence: "She will become a doctor after she graduates from university.",
+            sentence:
+              "She will become a doctor after she graduates from university.",
             translation:
               "Ella se va a convertir en doctora después de graduarse de la universidad.",
             options: [
@@ -697,7 +659,8 @@ export const levelsData: LevelData[] = [
             correctIndex: 1,
           },
           {
-            question: 'Si un texto dice "In conclusion...", ¿qué viene después?',
+            question:
+              'Si un texto dice "In conclusion...", ¿qué viene después?',
             options: [
               "Más ejemplos",
               "Un resumen o idea final",
@@ -831,8 +794,7 @@ export const levelsData: LevelData[] = [
             correctIndex: 2,
           },
           {
-            sentence:
-              "Can you identify the main idea of the second paragraph?",
+            sentence: "Can you identify the main idea of the second paragraph?",
             translation:
               "¿Podés identificar la idea principal del segundo párrafo?",
             options: [
@@ -852,19 +814,13 @@ export const levelsData: LevelData[] = [
           "Practicá tu expresión oral con frases útiles para conversaciones cotidianas y profesionales.",
         quiz: [
           {
-            question:
-              '¿Cuál es más formal? "Can I..." o "Could I..."?',
+            question: '¿Cuál es más formal? "Can I..." o "Could I..."?',
             options: ["Can I", "Could I", "Son iguales", "Ninguna"],
             correctIndex: 1,
           },
           {
             question: '"I would like to..." es una forma educada de:',
-            options: [
-              "Rechazar algo",
-              "Pedir algo",
-              "Quejarse",
-              "Despedirse",
-            ],
+            options: ["Rechazar algo", "Pedir algo", "Quejarse", "Despedirse"],
             correctIndex: 1,
           },
           {
@@ -898,7 +854,7 @@ export const levelsData: LevelData[] = [
             correctIndex: 1,
           },
           {
-            question: '"I\'m sorry, I didn\'t catch that" es similar a:',
+            question: "\"I'm sorry, I didn't catch that\" es similar a:",
             options: [
               "Estoy triste",
               "No te escuché bien",
@@ -1055,7 +1011,12 @@ export const levelsData: LevelData[] = [
           },
           {
             question: '"Deadline" significa:',
-            options: ["Línea muerta", "Fecha límite", "Hora de almuerzo", "Fin de semana"],
+            options: [
+              "Línea muerta",
+              "Fecha límite",
+              "Hora de almuerzo",
+              "Fin de semana",
+            ],
             correctIndex: 1,
           },
           {
@@ -1239,7 +1200,7 @@ export const levelsData: LevelData[] = [
             correctIndex: 2,
           },
           {
-            question: 'En escritura académica, se debe evitar:',
+            question: "En escritura académica, se debe evitar:",
             options: [
               "Usar datos y evidencia",
               "Usar lenguaje informal y slang",
@@ -1259,7 +1220,7 @@ export const levelsData: LevelData[] = [
             correctIndex: 1,
           },
           {
-            question: 'La estructura básica de un ensayo incluye:',
+            question: "La estructura básica de un ensayo incluye:",
             options: [
               "Solo el cuerpo",
               "Introducción, cuerpo y conclusión",
@@ -1404,7 +1365,7 @@ export const levelsData: LevelData[] = [
           "Preparate para exámenes internacionales como IELTS, TOEFL y Cambridge con estrategias y práctica.",
         quiz: [
           {
-            question: 'El examen IELTS evalúa:',
+            question: "El examen IELTS evalúa:",
             options: [
               "Solo gramática",
               "Listening, Reading, Writing y Speaking",
@@ -1414,7 +1375,7 @@ export const levelsData: LevelData[] = [
             correctIndex: 1,
           },
           {
-            question: 'En IELTS, la banda máxima es:',
+            question: "En IELTS, la banda máxima es:",
             options: ["5", "7", "9", "10"],
             correctIndex: 2,
           },
