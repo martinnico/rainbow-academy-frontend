@@ -1,882 +1,175 @@
 "use client";
 
-import { useState } from "react";
-import {
-  BookOpen,
-  Check,
-  ClipboardList,
-  Edit3,
-  Mail,
-  Phone,
-  Plus,
-  Search,
-  Trash2,
-  UserPlus,
-  Users,
-  X,
-} from "lucide-react";
-import { ebooksData } from "@/services/ebookCatalog";
-import {
-  getCustomEbookQuestions,
-  saveCustomEbookQuestions,
-  type CustomEbookQuestion,
-} from "@/services/ebookQuestionService";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { ArrowLeft, BookOpen, ClipboardList, Pencil, Plus, Trash2, Users } from "lucide-react";
+import ActivityEditor from "@/components/admin/ActivityEditor";
+import { courses, ebooks, lessons, students, verifyPassword } from "@/lib/api";
+import type {
+  CourseRequestDTO,
+  CourseResponseDTO,
+  EbookRequestDTO,
+  EbookResponseDTO,
+  LessonRequestDTO,
+  LessonResponseDTO,
+  UserProfileResponseDTO,
+} from "@/types/api";
 
-type PaymentStatus = "vigente" | "adeuda";
-type Sex = "Femenino" | "Masculino" | "Otro";
+const inputClass = "mt-2 h-11 w-full rounded-xl border border-stone-200 bg-[#fffdfa] px-3 text-sm text-stone-700 outline-none focus:border-[#7aaee8] focus:ring-4 focus:ring-[#7aaee8]/10";
+const emptyCourse: CourseRequestDTO = { title: "", description: "", level: "BEGINNER", monthlyPrice: 0, active: true };
+const emptyLesson: LessonRequestDTO = { courseId: 0, orderIndex: 1, title: "", videoUrl: "", description: "" };
+const emptyEbook: EbookRequestDTO = { title: "", description: "", price: 0, filePath: "", coverUrl: "" };
 
-type Student = {
-  id: number;
-  firstName: string;
-  lastName: string;
-  age: number;
-  sex: Sex;
-  email: string;
-  phone: string;
-  paymentStatus: PaymentStatus;
-};
-
-type StudentForm = Omit<Student, "id">;
-
-const emptyForm: StudentForm = {
-  firstName: "",
-  lastName: "",
-  age: 0,
-  sex: "Femenino",
-  email: "",
-  phone: "",
-  paymentStatus: "vigente",
-};
-
-const initialStudents: Student[] = [
-  {
-    id: 1,
-    firstName: "Camila",
-    lastName: "Fernández",
-    age: 24,
-    sex: "Femenino",
-    email: "camila.fernandez@email.com",
-    phone: "+54 9 3764 56-5439",
-    paymentStatus: "vigente",
-  },
-  {
-    id: 2,
-    firstName: "Mateo",
-    lastName: "Gómez",
-    age: 19,
-    sex: "Masculino",
-    email: "mateo.gomez@email.com",
-    phone: "+54 9 3764 22-1048",
-    paymentStatus: "adeuda",
-  },
-  {
-    id: 3,
-    firstName: "Sofía",
-    lastName: "Benítez",
-    age: 31,
-    sex: "Femenino",
-    email: "sofia.benitez@email.com",
-    phone: "+54 9 3764 88-2201",
-    paymentStatus: "vigente",
-  },
-  {
-    id: 4,
-    firstName: "Tomás",
-    lastName: "Ríos",
-    age: 27,
-    sex: "Masculino",
-    email: "tomas.rios@email.com",
-    phone: "+54 9 3764 41-7830",
-    paymentStatus: "adeuda",
-  },
-];
+type Section = "courses" | "students" | "ebooks";
+type Layer = "courses" | "lessons" | "lesson-editor";
 
 export default function AdminPage() {
-  const [activeMenu, setActiveMenu] = useState<"students" | "ebooks">(
-    "students",
-  );
-  const [students, setStudents] = useState<Student[]>(initialStudents);
-  const [form, setForm] = useState<StudentForm>(emptyForm);
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"todos" | PaymentStatus>(
-    "todos",
-  );
+  const [section, setSection] = useState<Section>("courses");
+  const [courseList, setCourseList] = useState<CourseResponseDTO[]>([]);
+  const [ebookList, setEbookList] = useState<EbookResponseDTO[]>([]);
+  const [studentList, setStudentList] = useState<UserProfileResponseDTO[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
-  const filteredStudents = students.filter((student) => {
-    const searchText = search.toLowerCase().trim();
-    const matchesSearch =
-      `${student.firstName} ${student.lastName} ${student.email}`
-        .toLowerCase()
-        .includes(searchText);
-    const matchesStatus =
-      statusFilter === "todos" || student.paymentStatus === statusFilter;
-
-    return matchesSearch && matchesStatus;
-  });
-
-  const currentTitle = editingId === null ? "Agregar alumno" : "Editar alumno";
-  const currentButtonLabel =
-    editingId === null ? "Guardar alumno" : "Guardar cambios";
-  const activeStudents = students.filter(
-    (student) => student.paymentStatus === "vigente",
-  ).length;
-  const studentsWithDebt = students.length - activeStudents;
-
-  const updateField = <Field extends keyof StudentForm>(
-    field: Field,
-    value: StudentForm[Field],
-  ) => {
-    setForm((current) => ({ ...current, [field]: value }));
-  };
-
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    if (editingId === null) {
-      setStudents((current) => [
-        ...current,
-        {
-          ...form,
-          id: Date.now(),
-          age: Number(form.age),
-        },
+  const load = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [nextCourses, nextEbooks, nextStudents] = await Promise.all([
+        courses.getCourses(),
+        ebooks.getEbooks(),
+        students.getStudents(),
       ]);
-    } else {
-      setStudents((current) =>
-        current.map((student) =>
-          student.id === editingId
-            ? { ...student, ...form, age: Number(form.age) }
-            : student,
-        ),
-      );
-    }
-
-    resetForm();
-  };
-
-  const startEditing = (student: Student) => {
-    setEditingId(student.id);
-    setForm({
-      firstName: student.firstName,
-      lastName: student.lastName,
-      age: student.age,
-      sex: student.sex,
-      email: student.email,
-      phone: student.phone,
-      paymentStatus: student.paymentStatus,
-    });
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const deleteStudent = (student: Student) => {
-    const confirmed = window.confirm(
-      `¿Querés borrar a ${student.firstName} ${student.lastName}?`,
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
-    setStudents((current) => current.filter((item) => item.id !== student.id));
-
-    if (editingId === student.id) {
-      resetForm();
+      setCourseList(nextCourses);
+      setEbookList(nextEbooks);
+      setStudentList(nextStudents);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "No pudimos cargar el panel.");
+    } finally {
+      setLoading(false);
     }
   };
 
-  function resetForm() {
-    setForm(emptyForm);
-    setEditingId(null);
-  }
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => { void load(); }, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, []);
+  const showNotice = (value: string) => {
+    setNotice(value);
+    window.setTimeout(() => setNotice(null), 3500);
+  };
 
   return (
-    <main className="min-h-screen bg-stone-50 pb-16">
-      <section className="relative overflow-hidden border-b border-stone-200 bg-white">
-        <div
-          className="absolute inset-0 opacity-70"
-          style={{
-            background:
-              "radial-gradient(circle at 10% 10%, rgba(232,216,122,.28), transparent 24%), radial-gradient(circle at 90% 40%, rgba(155,122,232,.16), transparent 30%), radial-gradient(circle at 50% 100%, rgba(122,174,232,.12), transparent 34%)",
-          }}
-        />
-        <div className="relative mx-auto max-w-7xl px-6 py-12 md:px-12 md:py-16">
-          <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[#7aaee8]">
-                Panel de administración
-              </p>
-              <h1
-                className="mt-3 text-4xl leading-tight text-stone-900 md:text-5xl"
-                style={{ fontFamily: "var(--font-playfair)" }}
-              >
-                {activeMenu === "students"
-                  ? "Alumnos de Rainbow Academy"
-                  : "Ebooks de Rainbow Academy"}
-              </h1>
-              <p className="mt-4 max-w-2xl text-sm leading-6 text-stone-600 md:text-base">
-                {activeMenu === "students"
-                  ? "Organizá los datos de tus alumnos y mantené sus cuotas al día desde un solo lugar."
-                  : "Elegí un ebook, seleccioná un capítulo y prepará preguntas para acompañar cada lectura."}
-              </p>
-            </div>
-            <div className="flex items-center gap-3 rounded-2xl border border-white/80 bg-white/80 px-5 py-4 shadow-sm backdrop-blur">
-              <div className="flex size-11 items-center justify-center rounded-2xl bg-[#e8d87a]/35 text-[#927f1c]">
-                <ClipboardList className="size-5" />
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-stone-400">
-                  Registros
-                </p>
-                <p className="mt-1 text-xl font-semibold text-stone-800">
-                  {students.length} alumnos
-                </p>
-              </div>
-            </div>
-          </div>
+    <main className="min-h-screen bg-gradient-to-br from-rose-50/70 via-purple-50/50 to-sky-50/70 pb-16">
+      <header className="border-b border-purple-100/80 bg-white/80 backdrop-blur-md">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-5 px-6 py-10 md:px-12">
+          <div><p className="text-xs font-semibold uppercase tracking-[0.3em] text-[#7aaee8]">Panel de administración</p><h1 className="mt-2 text-4xl text-stone-900" style={{ fontFamily: "var(--font-playfair)" }}>Rainbow Academy</h1></div>
+          <button type="button" onClick={() => void load()} className="rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-stone-600">Actualizar</button>
+          <nav className="flex w-full flex-wrap gap-2">
+            {([["courses", "Cursos y contenido", BookOpen], ["students", "Alumnos", Users], ["ebooks", "Ebooks", ClipboardList]] as const).map(([key, label, Icon]) => (
+              <button key={key} type="button" onClick={() => setSection(key)} className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-semibold ${section === key ? "bg-gradient-to-r from-pink-100 via-purple-100 to-sky-100 text-[#8062c4]" : "border border-purple-100 bg-white text-stone-500"}`}><Icon className="size-4" />{label}</button>
+            ))}
+          </nav>
         </div>
-      </section>
-
-      <nav
-        className="mx-auto flex max-w-7xl gap-2 px-6 pt-8 md:px-12"
-        aria-label="Secciones de administración"
-      >
-        <button
-          type="button"
-          onClick={() => setActiveMenu("students")}
-          className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${activeMenu === "students" ? "bg-stone-800 text-white shadow-sm" : "border border-stone-200 bg-white text-stone-500 hover:text-stone-800"}`}
-        >
-          <Users className="size-4" />
-          Alumnos
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveMenu("ebooks")}
-          className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${activeMenu === "ebooks" ? "bg-stone-800 text-white shadow-sm" : "border border-stone-200 bg-white text-stone-500 hover:text-stone-800"}`}
-        >
-          <BookOpen className="size-4" />
-          Ebooks y preguntas
-        </button>
-      </nav>
-
-      {activeMenu === "students" ? (
-        <>
-          <section className="mx-auto max-w-7xl px-6 pt-8 md:px-12">
-            <div className="grid gap-4 sm:grid-cols-3">
-              <StatCard
-                icon={<Users className="size-5" />}
-                label="Total de alumnos"
-                value={students.length}
-                color="#7aaee8"
-              />
-              <StatCard
-                icon={<Check className="size-5" />}
-                label="Cuotas vigentes"
-                value={activeStudents}
-                color="#8dc87a"
-              />
-              <StatCard
-                icon={<ClipboardList className="size-5" />}
-                label="Cuotas adeudadas"
-                value={studentsWithDebt}
-                color="#e8847a"
-              />
-            </div>
-          </section>
-
-          <section className="mx-auto grid max-w-7xl gap-8 px-6 pt-8 md:px-12 xl:grid-cols-[350px_1fr]">
-            <aside className="h-fit rounded-[1.75rem] border border-stone-200 bg-white p-6 shadow-sm xl:sticky xl:top-6">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400">
-                    {editingId === null
-                      ? "Nuevo registro"
-                      : "Registro seleccionado"}
-                  </p>
-                  <h2
-                    className="mt-2 text-2xl font-semibold text-stone-800"
-                    style={{ fontFamily: "var(--font-playfair)" }}
-                  >
-                    {currentTitle}
-                  </h2>
-                </div>
-                {editingId !== null && (
-                  <button
-                    type="button"
-                    onClick={resetForm}
-                    aria-label="Cancelar edición"
-                    className="rounded-lg p-2 text-stone-400 transition hover:bg-stone-100 hover:text-stone-700"
-                  >
-                    <X className="size-4" />
-                  </button>
-                )}
-              </div>
-
-              <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
-                <div className="grid grid-cols-2 gap-3">
-                  <FormField
-                    label="Nombre"
-                    value={form.firstName}
-                    onChange={(value) => updateField("firstName", value)}
-                    required
-                  />
-                  <FormField
-                    label="Apellido"
-                    value={form.lastName}
-                    onChange={(value) => updateField("lastName", value)}
-                    required
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <FormField
-                    label="Edad"
-                    type="number"
-                    min={1}
-                    max={120}
-                    value={form.age || ""}
-                    onChange={(value) => updateField("age", Number(value))}
-                    required
-                  />
-                  <label className="block text-xs font-semibold text-stone-600">
-                    Sexo
-                    <select
-                      value={form.sex}
-                      onChange={(event) =>
-                        updateField("sex", event.target.value as Sex)
-                      }
-                      className="mt-2 h-11 w-full rounded-xl border border-stone-200 bg-[#fffdfa] px-3 text-sm font-normal text-stone-700 outline-none transition focus:border-[#7aaee8] focus:ring-4 focus:ring-[#7aaee8]/10"
-                    >
-                      <option>Femenino</option>
-                      <option>Masculino</option>
-                      <option>Otro</option>
-                    </select>
-                  </label>
-                </div>
-                <FormField
-                  label="Email"
-                  type="email"
-                  value={form.email}
-                  onChange={(value) => updateField("email", value)}
-                  required
-                />
-                <FormField
-                  label="Teléfono"
-                  type="tel"
-                  value={form.phone}
-                  onChange={(value) => updateField("phone", value)}
-                  required
-                />
-                <label className="block text-xs font-semibold text-stone-600">
-                  Estado de cuota
-                  <select
-                    value={form.paymentStatus}
-                    onChange={(event) =>
-                      updateField(
-                        "paymentStatus",
-                        event.target.value as PaymentStatus,
-                      )
-                    }
-                    className="mt-2 h-11 w-full rounded-xl border border-stone-200 bg-[#fffdfa] px-3 text-sm font-normal text-stone-700 outline-none transition focus:border-[#7aaee8] focus:ring-4 focus:ring-[#7aaee8]/10"
-                  >
-                    <option value="vigente">Vigente</option>
-                    <option value="adeuda">Adeuda</option>
-                  </select>
-                </label>
-                <button
-                  type="submit"
-                  className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-stone-800 text-sm font-semibold text-white transition hover:bg-stone-700"
-                >
-                  {editingId === null ? (
-                    <Plus className="size-4" />
-                  ) : (
-                    <Edit3 className="size-4" />
-                  )}
-                  {currentButtonLabel}
-                </button>
-                {editingId !== null && (
-                  <button
-                    type="button"
-                    onClick={resetForm}
-                    className="w-full text-xs font-semibold text-stone-500 transition hover:text-stone-800"
-                  >
-                    Cancelar edición
-                  </button>
-                )}
-              </form>
-            </aside>
-
-            <div className="min-w-0 rounded-[1.75rem] border border-stone-200 bg-white p-5 shadow-sm md:p-6">
-              <div className="flex flex-col gap-4 border-b border-stone-100 pb-5 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400">
-                    Directorio
-                  </p>
-                  <h2
-                    className="mt-2 text-2xl font-semibold text-stone-800"
-                    style={{ fontFamily: "var(--font-playfair)" }}
-                  >
-                    Lista de alumnos
-                  </h2>
-                </div>
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <label className="relative block">
-                    <span className="sr-only">Buscar alumno</span>
-                    <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-stone-400" />
-                    <input
-                      value={search}
-                      onChange={(event) => setSearch(event.target.value)}
-                      placeholder="Buscar alumno..."
-                      className="h-10 w-full rounded-xl border border-stone-200 bg-[#fffdfa] pl-9 pr-3 text-sm outline-none transition focus:border-[#7aaee8] focus:ring-4 focus:ring-[#7aaee8]/10 sm:w-52"
-                    />
-                  </label>
-                  <select
-                    value={statusFilter}
-                    onChange={(event) =>
-                      setStatusFilter(
-                        event.target.value as "todos" | PaymentStatus,
-                      )
-                    }
-                    aria-label="Filtrar por estado de cuota"
-                    className="h-10 rounded-xl border border-stone-200 bg-[#fffdfa] px-3 text-sm text-stone-600 outline-none transition focus:border-[#7aaee8] focus:ring-4 focus:ring-[#7aaee8]/10"
-                  >
-                    <option value="todos">Todas las cuotas</option>
-                    <option value="vigente">Vigentes</option>
-                    <option value="adeuda">Adeudadas</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="mt-5 overflow-x-auto">
-                <table className="w-full min-w-[760px] border-collapse text-left">
-                  <thead>
-                    <tr className="border-b border-stone-100 text-[11px] uppercase tracking-[0.16em] text-stone-400">
-                      <th className="px-3 pb-3 font-semibold">Alumno</th>
-                      <th className="px-3 pb-3 font-semibold">Edad / sexo</th>
-                      <th className="px-3 pb-3 font-semibold">Contacto</th>
-                      <th className="px-3 pb-3 font-semibold">Cuota</th>
-                      <th className="px-3 pb-3 text-right font-semibold">
-                        Acciones
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-stone-100">
-                    {filteredStudents.map((student) => (
-                      <tr
-                        key={student.id}
-                        className="group transition hover:bg-[#fffdfa]"
-                      >
-                        <td className="px-3 py-4">
-                          <div className="flex items-center gap-3">
-                            <span
-                              className="flex size-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold text-white"
-                              style={{ background: avatarColor(student.id) }}
-                            >
-                              {student.firstName[0]}
-                              {student.lastName[0]}
-                            </span>
-                            <div>
-                              <p className="font-semibold text-stone-800">
-                                {student.firstName} {student.lastName}
-                              </p>
-                              <p className="mt-1 text-xs text-stone-400">
-                                Alumno #{String(student.id).padStart(3, "0")}
-                              </p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-3 py-4 text-sm text-stone-600">
-                          <p>{student.age} años</p>
-                          <p className="mt-1 text-xs text-stone-400">
-                            {student.sex}
-                          </p>
-                        </td>
-                        <td className="px-3 py-4 text-sm text-stone-600">
-                          <p className="flex items-center gap-2">
-                            <Mail className="size-3.5 text-stone-400" />
-                            {student.email}
-                          </p>
-                          <p className="mt-2 flex items-center gap-2 text-xs text-stone-400">
-                            <Phone className="size-3.5" />
-                            {student.phone}
-                          </p>
-                        </td>
-                        <td className="px-3 py-4">
-                          <span
-                            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] ${student.paymentStatus === "vigente" ? "bg-[#eaf5e5] text-[#3b6d11]" : "bg-[#fce9e6] text-[#ad4237]"}`}
-                          >
-                            <span
-                              className={`size-1.5 rounded-full ${student.paymentStatus === "vigente" ? "bg-[#8dc87a]" : "bg-[#e8847a]"}`}
-                            />
-                            {student.paymentStatus}
-                          </span>
-                        </td>
-                        <td className="px-3 py-4">
-                          <div className="flex justify-end gap-1">
-                            <button
-                              type="button"
-                              onClick={() => startEditing(student)}
-                              aria-label={`Editar a ${student.firstName} ${student.lastName}`}
-                              className="rounded-lg p-2 text-[#537da9] transition hover:bg-[#e6f1fb]"
-                            >
-                              <Edit3 className="size-4" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => deleteStudent(student)}
-                              aria-label={`Borrar a ${student.firstName} ${student.lastName}`}
-                              className="rounded-lg p-2 text-[#c45c52] transition hover:bg-[#fce9e6]"
-                            >
-                              <Trash2 className="size-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {filteredStudents.length === 0 && (
-                  <div className="flex flex-col items-center justify-center py-14 text-center">
-                    <UserPlus className="size-8 text-stone-300" />
-                    <p className="mt-3 font-semibold text-stone-600">
-                      No encontramos alumnos
-                    </p>
-                    <p className="mt-1 text-sm text-stone-400">
-                      Probá con otro nombre o limpiá los filtros.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </section>
-        </>
-      ) : (
-        <EbookQuestionsPanel />
-      )}
+      </header>
+      <div className="mx-auto max-w-7xl px-6 pt-8 md:px-12">
+        {loading && <Notice tone="info">Cargando datos del backend...</Notice>}
+        {error && <Notice tone="error">{error}<button type="button" onClick={() => void load()} className="ml-3 underline">Reintentar</button></Notice>}
+        {notice && <Notice tone="success">{notice}</Notice>}
+        {!loading && !error && section === "courses" && <CourseDrillDown courses={courseList} onCoursesChange={setCourseList} onNotice={showNotice} onError={setError} />}
+        {!loading && !error && section === "students" && <StudentsPanel data={studentList} onChange={setStudentList} onNotice={showNotice} onError={setError} />}
+        {!loading && !error && section === "ebooks" && <EbooksPanel data={ebookList} onChange={setEbookList} onNotice={showNotice} onError={setError} />}
+      </div>
     </main>
   );
 }
 
-function EbookQuestionsPanel() {
-  const [selectedEbookId, setSelectedEbookId] = useState(ebooksData[0].id);
-  const [selectedChapterId, setSelectedChapterId] = useState(
-    ebooksData[0].chapters[0].id,
-  );
-  const [customQuestions, setCustomQuestions] = useState<CustomEbookQuestion[]>(
-    () => getCustomEbookQuestions(),
-  );
-  const [questionText, setQuestionText] = useState("");
-  const [options, setOptions] = useState(["", "", "", ""]);
-  const [correctIndex, setCorrectIndex] = useState(0);
+function CourseDrillDown({ courses: courseList, onCoursesChange, onNotice, onError }: { courses: CourseResponseDTO[]; onCoursesChange: (items: CourseResponseDTO[]) => void; onNotice: (message: string) => void; onError: (message: string) => void }) {
+  const [layer, setLayer] = useState<Layer>("courses");
+  const [selectedCourse, setSelectedCourse] = useState<CourseResponseDTO | null>(null);
+  const [selectedLesson, setSelectedLesson] = useState<LessonResponseDTO | null>(null);
+  const [lessonList, setLessonList] = useState<LessonResponseDTO[]>([]);
+  const [courseForm, setCourseForm] = useState<CourseRequestDTO>(emptyCourse);
+  const [editingCourseId, setEditingCourseId] = useState<number | null>(null);
+  const [lessonForm, setLessonForm] = useState<LessonRequestDTO>(emptyLesson);
+  const [editingLessonId, setEditingLessonId] = useState<number | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ kind: "course" | "lesson"; id: number; name: string } | null>(null);
 
-  const selectedEbook =
-    ebooksData.find((ebook) => ebook.id === selectedEbookId) ?? ebooksData[0];
-  const selectedChapter =
-    selectedEbook.chapters.find(
-      (chapter) => chapter.id === selectedChapterId,
-    ) ?? selectedEbook.chapters[0];
-  const chapterQuestions = customQuestions.filter(
-    (question) =>
-      question.ebookId === selectedEbook.id &&
-      question.chapterId === selectedChapter.id,
-  );
-
-  const selectEbook = (ebookId: string) => {
-    const ebook =
-      ebooksData.find((item) => item.id === ebookId) ?? ebooksData[0];
-    setSelectedEbookId(ebook.id);
-    setSelectedChapterId(ebook.chapters[0].id);
+  const openCourse = async (course: CourseResponseDTO) => {
+    setSelectedCourse(course);
+    setLessonList(await lessons.getLessonsByCourse(course.id));
+    setLayer("lessons");
   };
-
-  const updateOption = (index: number, value: string) => {
-    setOptions((current) =>
-      current.map((option, optionIndex) =>
-        optionIndex === index ? value : option,
-      ),
-    );
-  };
-
-  const addQuestion = (event: React.FormEvent<HTMLFormElement>) => {
+  const saveCourse = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-
-    const newQuestion: CustomEbookQuestion = {
-      id: createQuestionId(),
-      ebookId: selectedEbook.id,
-      chapterId: selectedChapter.id,
-      question: questionText.trim(),
-      options: options.map((option) => option.trim()),
-      correctIndex,
-    };
-    const nextQuestions = [...customQuestions, newQuestion];
-
-    setCustomQuestions(nextQuestions);
-    saveCustomEbookQuestions(nextQuestions);
-    setQuestionText("");
-    setOptions(["", "", "", ""]);
-    setCorrectIndex(0);
+    try {
+      const saved = editingCourseId === null ? await courses.createCourse(courseForm) : await courses.updateCourse(editingCourseId, courseForm);
+      onCoursesChange(editingCourseId === null ? [...courseList, saved] : courseList.map((item) => item.id === saved.id ? saved : item));
+      setCourseForm(emptyCourse); setEditingCourseId(null); onNotice("Curso guardado correctamente.");
+    } catch (saveError) { onError(saveError instanceof Error ? saveError.message : "No pudimos guardar el curso."); }
+  };
+  const saveLesson = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    try {
+      const saved = editingLessonId === null ? await lessons.createLesson(lessonForm) : await lessons.updateLesson(editingLessonId, lessonForm);
+      setLessonList((items) => editingLessonId === null ? [...items, saved].sort((a, b) => a.orderIndex - b.orderIndex) : items.map((item) => item.id === saved.id ? saved : item));
+      setLessonForm({ ...emptyLesson, courseId: selectedCourse?.id ?? 0 }); setEditingLessonId(null); onNotice("Lección guardada correctamente.");
+    } catch (saveError) { onError(saveError instanceof Error ? saveError.message : "No pudimos guardar la lección."); }
+  };
+  const confirmDelete = async (password: string) => {
+    if (!deleteTarget) return;
+    try {
+      await verifyPassword(password);
+      if (deleteTarget.kind === "course") {
+        await courses.deleteCourse(deleteTarget.id);
+        onCoursesChange(courseList.filter((item) => item.id !== deleteTarget.id));
+        if (selectedCourse?.id === deleteTarget.id) setLayer("courses");
+      } else {
+        await lessons.deleteLesson(deleteTarget.id);
+        setLessonList((items) => items.filter((item) => item.id !== deleteTarget.id));
+      }
+      setDeleteTarget(null); onNotice("Eliminado correctamente.");
+    } catch (deleteError) { onError(deleteError instanceof Error ? deleteError.message : "Contraseña incorrecta"); }
+  };
+  const saveEditorLesson = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!selectedLesson) return;
+    try {
+      const saved = await lessons.updateLesson(selectedLesson.id, lessonForm);
+      setSelectedLesson(saved);
+      setLessonList((items) => items.map((item) => item.id === saved.id ? saved : item));
+      onNotice("Video y descripción actualizados.");
+    } catch (saveError) {
+      onError(saveError instanceof Error ? saveError.message : "No pudimos actualizar la lección.");
+    }
   };
 
-  const removeQuestion = (questionId: string) => {
-    const nextQuestions = customQuestions.filter(
-      (question) => question.id !== questionId,
-    );
-    setCustomQuestions(nextQuestions);
-    saveCustomEbookQuestions(nextQuestions);
-  };
-
-  return (
-    <section className="mx-auto grid max-w-7xl gap-8 px-6 pt-8 md:px-12 xl:grid-cols-[350px_1fr]">
-      <aside className="h-fit rounded-[1.75rem] border border-stone-200 bg-white p-6 shadow-sm xl:sticky xl:top-6">
-        <div className="flex items-start gap-3">
-          <div
-            className="flex size-11 shrink-0 items-center justify-center rounded-2xl text-white"
-            style={{ background: selectedEbook.color }}
-          >
-            <BookOpen className="size-5" />
-          </div>
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400">
-              Contenido
-            </p>
-            <h2
-              className="mt-2 text-2xl font-semibold text-stone-800"
-              style={{ fontFamily: "var(--font-playfair)" }}
-            >
-              Nueva pregunta
-            </h2>
-          </div>
-        </div>
-
-        <form className="mt-6 space-y-4" onSubmit={addQuestion}>
-          <label className="block text-xs font-semibold text-stone-600">
-            Ebook
-            <select
-              value={selectedEbook.id}
-              onChange={(event) => selectEbook(event.target.value)}
-              className="mt-2 h-11 w-full rounded-xl border border-stone-200 bg-[#fffdfa] px-3 text-sm font-normal text-stone-700 outline-none transition focus:border-[#7aaee8] focus:ring-4 focus:ring-[#7aaee8]/10"
-            >
-              {ebooksData.map((ebook) => (
-                <option key={ebook.id} value={ebook.id}>
-                  {ebook.title}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block text-xs font-semibold text-stone-600">
-            Capítulo
-            <select
-              value={selectedChapter.id}
-              onChange={(event) => setSelectedChapterId(event.target.value)}
-              className="mt-2 h-11 w-full rounded-xl border border-stone-200 bg-[#fffdfa] px-3 text-sm font-normal text-stone-700 outline-none transition focus:border-[#7aaee8] focus:ring-4 focus:ring-[#7aaee8]/10"
-            >
-              {selectedEbook.chapters.map((chapter) => (
-                <option key={chapter.id} value={chapter.id}>
-                  {chapter.title}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block text-xs font-semibold text-stone-600">
-            Pregunta
-            <textarea
-              required
-              value={questionText}
-              onChange={(event) => setQuestionText(event.target.value)}
-              placeholder="¿Qué aprendió el personaje principal?"
-              rows={3}
-              className="mt-2 w-full resize-none rounded-xl border border-stone-200 bg-[#fffdfa] px-3 py-3 text-sm font-normal text-stone-700 outline-none transition focus:border-[#7aaee8] focus:ring-4 focus:ring-[#7aaee8]/10"
-            />
-          </label>
-          <div className="space-y-2">
-            <p className="text-xs font-semibold text-stone-600">
-              Opciones y respuesta correcta
-            </p>
-            {options.map((option, index) => (
-              <div key={index} className="flex items-center gap-2">
-                <input
-                  required
-                  value={option}
-                  onChange={(event) => updateOption(index, event.target.value)}
-                  placeholder={`Opción ${index + 1}`}
-                  className="h-10 min-w-0 flex-1 rounded-xl border border-stone-200 bg-[#fffdfa] px-3 text-sm text-stone-700 outline-none transition focus:border-[#7aaee8] focus:ring-4 focus:ring-[#7aaee8]/10"
-                />
-                <label className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-stone-200 text-xs text-stone-400 transition has-[:checked]:border-[#8dc87a] has-[:checked]:bg-[#eaf5e5] has-[:checked]:text-[#3b6d11]">
-                  <span className="sr-only">
-                    Marcar opción {index + 1} como correcta
-                  </span>
-                  <input
-                    type="radio"
-                    name="correctOption"
-                    checked={correctIndex === index}
-                    onChange={() => setCorrectIndex(index)}
-                    className="sr-only"
-                  />
-                  <Check className="size-4" />
-                </label>
-              </div>
-            ))}
-          </div>
-          <button
-            type="submit"
-            className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-stone-800 text-sm font-semibold text-white transition hover:bg-stone-700"
-          >
-            <Plus className="size-4" />
-            Agregar pregunta
-          </button>
-        </form>
-      </aside>
-
-      <div className="rounded-[1.75rem] border border-stone-200 bg-white p-5 shadow-sm md:p-7">
-        <div className="flex flex-col gap-5 border-b border-stone-100 pb-6 md:flex-row md:items-start md:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400">
-              Preguntas personalizadas
-            </p>
-            <h2
-              className="mt-2 text-2xl font-semibold text-stone-800"
-              style={{ fontFamily: "var(--font-playfair)" }}
-            >
-              {selectedChapter.title}
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-stone-500">
-              Las preguntas aparecen al final de este capítulo para que el
-              alumno compruebe su comprensión.
-            </p>
-          </div>
-          <span
-            className="inline-flex w-fit items-center rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em]"
-            style={{
-              background: selectedEbook.bgLight,
-              color: selectedEbook.textColor,
-            }}
-          >
-            {selectedEbook.level} · {chapterQuestions.length} nuevas
-          </span>
-        </div>
-
-        <div className="mt-6 space-y-3">
-          {chapterQuestions.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-stone-200 bg-[#fffdfa] px-6 py-12 text-center">
-              <ClipboardList className="mx-auto size-8 text-stone-300" />
-              <p className="mt-3 font-semibold text-stone-600">
-                Todavía no hay preguntas personalizadas
-              </p>
-              <p className="mt-1 text-sm text-stone-400">
-                Agregá la primera desde el formulario.
-              </p>
-            </div>
-          ) : (
-            chapterQuestions.map((question, index) => (
-              <div
-                key={question.id}
-                className="rounded-2xl border border-stone-200 bg-[#fffdfa] p-5"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7aaee8]">
-                      Pregunta {index + 1}
-                    </p>
-                    <p className="mt-2 font-semibold text-stone-800">
-                      {question.question}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => removeQuestion(question.id)}
-                    aria-label="Eliminar pregunta"
-                    className="rounded-lg p-2 text-[#c45c52] transition hover:bg-[#fce9e6]"
-                  >
-                    <Trash2 className="size-4" />
-                  </button>
-                </div>
-                <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                  {question.options.map((option, optionIndex) => (
-                    <span
-                      key={option}
-                      className={`rounded-xl border px-3 py-2 text-sm ${optionIndex === question.correctIndex ? "border-[#8dc87a] bg-[#eaf5e5] font-semibold text-[#3b6d11]" : "border-stone-200 text-stone-500"}`}
-                    >
-                      {option}
-                      {optionIndex === question.correctIndex && (
-                        <span className="ml-2 text-xs">✓ correcta</span>
-                      )}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-    </section>
-  );
+  if (layer === "lesson-editor" && selectedLesson && selectedCourse) {
+    return <section className="space-y-5"><button type="button" onClick={() => setLayer("lessons")} className="inline-flex items-center gap-2 text-sm font-semibold text-[#527db3]"><ArrowLeft className="size-4" />Volver a Lecciones de {selectedCourse.title}</button><div className="rounded-[1.75rem] border border-purple-100 bg-white p-6 shadow-sm"><p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#7aaee8]">Lección #{selectedLesson.orderIndex}</p><h2 className="mt-2 text-3xl font-semibold text-stone-800">{selectedLesson.title}</h2><p className="mt-2 text-sm text-stone-500">Editor de video, descripción y actividad.</p><FormCard title="Video y descripción" onSubmit={saveEditorLesson}><Field label="URL del video" value={lessonForm.videoUrl} onChange={(value) => setLessonForm({ ...lessonForm, videoUrl: value })} /><Field label="Descripción" value={lessonForm.description} onChange={(value) => setLessonForm({ ...lessonForm, description: value })} textarea /><button className="rounded-xl bg-stone-800 px-4 py-2 text-sm font-semibold text-white">Guardar cambios</button></FormCard><div className="mt-6"><ActivityEditor key={selectedLesson.id} courses={[selectedCourse]} lessons={[selectedLesson]} selectedCourseId={selectedCourse.id} initialLessonId={selectedLesson.id} onCourseChange={() => undefined} onError={onError} onNotice={onNotice} /></div></div></section>;
+  }
+  if (layer === "lessons" && selectedCourse) {
+    return <section className="space-y-6"><div className="flex flex-wrap items-center justify-between gap-4"><button type="button" onClick={() => setLayer("courses")} className="inline-flex items-center gap-2 text-sm font-semibold text-[#527db3]"><ArrowLeft className="size-4" />Volver a Cursos</button><button type="button" onClick={() => { setEditingLessonId(null); setLessonForm({ ...emptyLesson, courseId: selectedCourse.id }); }} className="rounded-full bg-stone-800 px-4 py-2 text-sm font-semibold text-white">+ Nueva Lección en este Curso</button></div><h2 className="text-3xl font-semibold text-stone-800">{selectedCourse.title}</h2><div className="grid gap-4 md:grid-cols-2">{lessonList.map((lesson) => <article key={lesson.id} className="rounded-3xl border border-purple-100 bg-white p-5 shadow-sm"><p className="text-xs font-bold uppercase tracking-widest text-[#7aaee8]">Lección {lesson.orderIndex}</p><h3 className="mt-2 text-lg font-semibold text-stone-800">{lesson.title}</h3><p className="mt-2 text-sm text-stone-500">{lesson.description}</p><span className="mt-3 inline-flex rounded-full bg-purple-50 px-3 py-1 text-xs font-semibold text-purple-700">{lesson.activity ? `${lesson.activity.type === "QUIZ" ? "❓ Quiz" : "🧩 Sopa de Letras"}: ${lesson.activity.title}` : "Sin actividad"}</span><div className="mt-4 flex flex-wrap gap-2"><button type="button" onClick={() => { setSelectedLesson(lesson); setLessonForm(lesson); setLayer("lesson-editor"); }} className="rounded-xl bg-purple-100 px-3 py-2 text-xs font-semibold text-purple-700">🎬 Configurar Lección y Actividad</button><button type="button" onClick={() => { setEditingLessonId(lesson.id); setLessonForm(lesson); }} className="rounded-xl bg-sky-100 px-3 py-2 text-xs font-semibold text-sky-700">✏️ Editar Datos</button><button type="button" onClick={() => setDeleteTarget({ kind: "lesson", id: lesson.id, name: lesson.title })} className="rounded-xl bg-rose-100 px-3 py-2 text-xs font-semibold text-rose-700">🗑️ Eliminar</button></div></article>)}</div><FormCard title={editingLessonId === null ? "Nueva lección" : "Editar lección"} onSubmit={saveLesson}><Field label="Título" value={lessonForm.title} onChange={(value) => setLessonForm({ ...lessonForm, title: value })} /><Field label="Orden" type="number" value={lessonForm.orderIndex} onChange={(value) => setLessonForm({ ...lessonForm, orderIndex: Number(value) })} /><Field label="URL del video" value={lessonForm.videoUrl} onChange={(value) => setLessonForm({ ...lessonForm, videoUrl: value })} /><Field label="Descripción" value={lessonForm.description} onChange={(value) => setLessonForm({ ...lessonForm, description: value })} textarea /><button className="rounded-xl bg-stone-800 px-4 py-2 text-sm font-semibold text-white">Guardar lección</button></FormCard>{deleteTarget && <PasswordModal target={deleteTarget.name} onCancel={() => setDeleteTarget(null)} onConfirm={confirmDelete} />}</section>;
+  }
+  return <section className="space-y-6"><div className="flex items-center justify-between"><div><p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#7aaee8]">Capa 1 · Cursos y contenido</p><h2 className="mt-2 text-3xl font-semibold text-stone-800">Cursos</h2></div><button type="button" onClick={() => { setEditingCourseId(null); setCourseForm(emptyCourse); }} className="rounded-full bg-stone-800 px-4 py-2 text-sm font-semibold text-white"><Plus className="mr-1 inline size-4" />Crear Nuevo Curso</button></div><div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">{courseList.map((course) => <article key={course.id} className="rounded-3xl border border-purple-100 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-lg"><h3 className="text-xl font-semibold text-stone-800">{course.title}</h3><p className="mt-2 text-xs font-bold uppercase tracking-widest text-[#7aaee8]">{course.level}</p><p className="mt-3 text-sm text-stone-500">{course.description}</p><p className="mt-3 font-semibold text-stone-800">${course.monthlyPrice.toLocaleString("es-AR")}</p><div className="mt-5 grid gap-2"><button type="button" onClick={() => void openCourse(course)} className="rounded-xl bg-purple-100 px-3 py-2 text-sm font-semibold text-purple-700">📂 Entrar al Curso (Ver Lecciones)</button><button type="button" onClick={() => { setEditingCourseId(course.id); setCourseForm(course); }} className="rounded-xl bg-sky-100 px-3 py-2 text-sm font-semibold text-sky-700"><Pencil className="mr-1 inline size-4" />Editar</button><button type="button" onClick={() => setDeleteTarget({ kind: "course", id: course.id, name: course.title })} className="rounded-xl bg-rose-100 px-3 py-2 text-sm font-semibold text-rose-700"><Trash2 className="mr-1 inline size-4" />Eliminar</button></div></article>)}</div><FormCard title={editingCourseId === null ? "Nuevo curso" : "Editar curso"} onSubmit={saveCourse}><Field label="Título" value={courseForm.title} onChange={(value) => setCourseForm({ ...courseForm, title: value })} /><Field label="Descripción" value={courseForm.description} onChange={(value) => setCourseForm({ ...courseForm, description: value })} textarea /><Field label="Precio" type="number" value={courseForm.monthlyPrice} onChange={(value) => setCourseForm({ ...courseForm, monthlyPrice: Number(value) })} /><label className="text-xs font-semibold text-stone-600">Nivel<select value={courseForm.level} onChange={(event) => setCourseForm({ ...courseForm, level: event.target.value as CourseRequestDTO["level"] })} className={inputClass}><option value="BEGINNER">BEGINNER</option><option value="INTERMEDIATE">INTERMEDIATE</option><option value="ADVANCED">ADVANCED</option></select></label><button className="rounded-xl bg-stone-800 px-4 py-2 text-sm font-semibold text-white">Guardar curso</button></FormCard>{deleteTarget && <PasswordModal target={deleteTarget.name} onCancel={() => setDeleteTarget(null)} onConfirm={confirmDelete} />}</section>;
 }
 
-function createQuestionId() {
-  return `custom-${Date.now()}`;
+function PasswordModal({ target, onCancel, onConfirm }: { target: string; onCancel: () => void; onConfirm: (password: string) => Promise<void> }) {
+  const [password, setPassword] = useState("");
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/30 p-4"><form onSubmit={(event) => { event.preventDefault(); void onConfirm(password); }} className="w-full max-w-md rounded-3xl border border-pink-100 bg-white p-6 shadow-2xl"><h2 className="text-xl font-semibold text-stone-800">Confirmar eliminación</h2><p className="mt-3 text-sm text-stone-600">¿Estás segura de que querés eliminar &quot;{target}&quot;? Esta acción no se puede deshacer.</p><label className="mt-5 block text-sm font-semibold text-stone-700">Ingresá tu contraseña<input required type="password" value={password} onChange={(event) => setPassword(event.target.value)} className={inputClass} /></label><div className="mt-5 flex justify-end gap-2"><button type="button" onClick={onCancel} className="rounded-xl px-4 py-2 text-sm text-stone-500">Cancelar</button><button className="rounded-xl bg-rose-500 px-4 py-2 text-sm font-semibold text-white">Confirmar</button></div></form></div>;
 }
 
-function FormField({
-  label,
-  value,
-  onChange,
-  type = "text",
-  min,
-  max,
-  required = false,
-}: {
-  label: string;
-  value: string | number;
-  onChange: (value: string) => void;
-  type?: string;
-  min?: number;
-  max?: number;
-  required?: boolean;
-}) {
-  return (
-    <label className="block text-xs font-semibold text-stone-600">
-      {label}
-      <input
-        required={required}
-        type={type}
-        min={min}
-        max={max}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="mt-2 h-11 w-full rounded-xl border border-stone-200 bg-[#fffdfa] px-3 text-sm font-normal text-stone-700 outline-none transition focus:border-[#7aaee8] focus:ring-4 focus:ring-[#7aaee8]/10"
-      />
-    </label>
-  );
+function StudentsPanel({ data, onChange, onNotice, onError }: { data: UserProfileResponseDTO[]; onChange: (items: UserProfileResponseDTO[]) => void; onNotice: (message: string) => void; onError: (message: string) => void }) {
+  return <section className="rounded-3xl border border-purple-100 bg-white p-6 shadow-sm"><h2 className="text-2xl font-semibold text-stone-800">Alumnos</h2><div className="mt-5 grid gap-3">{data.map((student) => <article key={student.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-[#fffdfa] p-4"><div><p className="font-semibold text-stone-800">{student.fullName}</p><p className="text-sm text-stone-500">{student.email ?? student.username}</p></div><button type="button" onClick={() => void students.updateStudentGraduation(student.id, !student.graduated).then((updated) => { onChange(data.map((item) => item.id === updated.id ? updated : item)); onNotice(updated.graduated ? "Alumno graduado." : "Graduación quitada."); }).catch((actionError: unknown) => onError(actionError instanceof Error ? actionError.message : "No pudimos actualizar el alumno."))} className="rounded-xl bg-purple-100 px-3 py-2 text-xs font-semibold text-purple-700">{student.graduated ? "Desgraduar" : "Graduar"}</button></article>)}</div></section>;
 }
 
-function StatCard({
-  icon,
-  label,
-  value,
-  color,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: number;
-  color: string;
-}) {
-  return (
-    <div className="flex items-center gap-4 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-      <div
-        className="flex size-11 items-center justify-center rounded-2xl text-white"
-        style={{ background: color }}
-      >
-        {icon}
-      </div>
-      <div>
-        <p className="text-xs uppercase tracking-[0.16em] text-stone-400">
-          {label}
-        </p>
-        <p className="mt-1 text-2xl font-semibold text-stone-800">{value}</p>
-      </div>
-    </div>
-  );
+function EbooksPanel({ data, onChange, onNotice, onError }: { data: EbookResponseDTO[]; onChange: (items: EbookResponseDTO[]) => void; onNotice: (message: string) => void; onError: (message: string) => void }) {
+  const [form, setForm] = useState<EbookRequestDTO>(emptyEbook);
+  const [deleteTarget, setDeleteTarget] = useState<EbookResponseDTO | null>(null);
+  const save = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); try { const saved = await ebooks.createEbook(form); onChange([...data, saved]); setForm(emptyEbook); onNotice("Ebook creado correctamente."); } catch (saveError) { onError(saveError instanceof Error ? saveError.message : "No pudimos guardar el ebook."); } };
+  const remove = async (password: string) => { if (!deleteTarget) return; try { await verifyPassword(password); await ebooks.deleteEbook(deleteTarget.id); onChange(data.filter((item) => item.id !== deleteTarget.id)); setDeleteTarget(null); onNotice("Ebook eliminado correctamente."); } catch (deleteError) { onError(deleteError instanceof Error ? deleteError.message : "Contraseña incorrecta"); } };
+  return <section className="space-y-5"><FormCard title="Nuevo ebook" onSubmit={save}><Field label="Título" value={form.title} onChange={(value) => setForm({ ...form, title: value })} /><Field label="Descripción" value={form.description} onChange={(value) => setForm({ ...form, description: value })} textarea /><Field label="Precio" type="number" value={form.price} onChange={(value) => setForm({ ...form, price: Number(value) })} /><Field label="Ruta del archivo" value={form.filePath} onChange={(value) => setForm({ ...form, filePath: value })} /><button className="rounded-xl bg-stone-800 px-4 py-2 text-sm font-semibold text-white">Guardar ebook</button></FormCard><div className="grid gap-4 md:grid-cols-2">{data.map((ebook) => <article key={ebook.id} className="rounded-3xl border border-purple-100 bg-white p-5"><h3 className="font-semibold text-stone-800">{ebook.title}</h3><p className="mt-2 text-sm text-stone-500">{ebook.description}</p><button type="button" onClick={() => setDeleteTarget(ebook)} className="mt-4 rounded-xl bg-rose-100 px-3 py-2 text-xs font-semibold text-rose-700">🗑️ Eliminar</button></article>)}</div>{deleteTarget && <PasswordModal target={deleteTarget.title} onCancel={() => setDeleteTarget(null)} onConfirm={remove} />}</section>;
 }
 
-function avatarColor(id: number) {
-  const colors = ["#e8847a", "#7aaee8", "#9b7ae8", "#8dc87a"];
-  return colors[(id - 1) % colors.length];
-}
+function FormCard({ title, onSubmit, children }: { title: string; onSubmit: (event: FormEvent<HTMLFormElement>) => void | Promise<void>; children: ReactNode }) { return <form onSubmit={onSubmit} className="rounded-3xl border border-purple-100 bg-white p-6 shadow-sm"><h3 className="text-xl font-semibold text-stone-800">{title}</h3><div className="mt-4 grid gap-4">{children}</div></form>; }
+function Field({ label, value, onChange, type = "text", textarea = false }: { label: string; value: string | number; onChange: (value: string) => void; type?: string; textarea?: boolean }) { return <label className="text-xs font-semibold text-stone-600">{label}{textarea ? <textarea required value={value} onChange={(event) => onChange(event.target.value)} className={`${inputClass} h-24 py-3`} /> : <input required type={type} value={value} onChange={(event) => onChange(event.target.value)} className={inputClass} />}</label>; }
+function Notice({ tone, children }: { tone: "info" | "error" | "success"; children: ReactNode }) { const styles = { info: "bg-[#f5f8fc] text-[#527db3]", error: "bg-[#fff0ed] text-[#a34d45]", success: "bg-[#eaf5e5] text-[#3b6d11]" }; return <div className={`mb-4 rounded-2xl border border-white p-4 text-sm ${styles[tone]}`}>{children}</div>; }

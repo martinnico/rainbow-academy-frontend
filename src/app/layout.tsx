@@ -3,6 +3,7 @@ import { Playfair_Display, DM_Sans, Geist, Cinzel } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/services/utils";
 import { NavBar, Footer } from "@/components";
+import { AuthProvider } from "@/context/AuthContext";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
 
@@ -27,7 +28,7 @@ const cinzel = Cinzel({
 
 export const metadata: Metadata = {
   title: "Rainbow Academy",
-  description: "Aprendé inglés a tu ritmo, a tu nivel",
+  description: "Aprendé inglés a tu ritmo y a tu nivel",
 };
 
 export default function RootLayout({
@@ -47,9 +48,11 @@ export default function RootLayout({
       )}
     >
       <body className="font-sans bg-stone-50 text-stone-800 antialiased">
-        <NavBar />
-        {children}
-        <Footer />
+        <AuthProvider>
+          <NavBar />
+          {children}
+          <Footer />
+        </AuthProvider>
       </body>
     </html>
   );

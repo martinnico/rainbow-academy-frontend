@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -13,17 +13,64 @@ import {
 } from "lucide-react";
 import { ebooksData } from "@/services/ebookCatalog";
 import { questionsForChapter } from "@/services/ebookQuestionService";
+import { createPaymentPreference, ebooks as ebooksApi } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
+import type { EbookResponseDTO } from "@/types/api";
 
 export default function EbookReaderPage() {
   const { ebookId } = useParams<{ ebookId: string }>();
-  const ebook = ebooksData.find((item) => item.id === ebookId) ?? ebooksData[0];
+  const localEbook = ebooksData.find((item) => item.id === ebookId) ?? ebooksData[0];
+  const { user } = useAuth();
+  const [ebook, setEbook] = useState<EbookResponseDTO | null>(null);
+  const [hasAccess, setHasAccess] = useState(false);
+  const [isPurchasing, setIsPurchasing] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
   const [chapterIndex, setChapterIndex] = useState(0);
-  const chapter = ebook.chapters[chapterIndex] ?? ebook.chapters[0];
+  const chapter = localEbook.chapters[chapterIndex] ?? localEbook.chapters[0];
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [isChecked, setIsChecked] = useState(false);
 
+  useEffect(() => {
+    ebooksApi
+      .getEbooks()
+      .then((items) => {
+        const found = items.find((item) => String(item.id) === ebookId);
+        if (found) setEbook(found);
+      })
+      .catch(() => setMessage("No pudimos cargar este ebook."));
+  }, [ebookId]);
+
+  useEffect(() => {
+    if (user && ebook) {
+      ebooksApi
+        .checkEbookAccess(ebook.id, user.id)
+        .then(() => setHasAccess(true))
+        .catch(() => setHasAccess(false));
+    }
+  }, [user, ebook]);
+
+  const purchase = async () => {
+    if (!user || !ebook) {
+      setMessage("Iniciá sesión para comprar este ebook.");
+      return;
+    }
+    setIsPurchasing(true);
+    try {
+      const response = await createPaymentPreference({
+        itemType: "EBOOK",
+        itemId: ebook.id,
+        studentId: user.id,
+      });
+      window.location.assign(response.initPoint);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "No pudimos registrar la compra.");
+    } finally {
+      setIsPurchasing(false);
+    }
+  };
+
   const questions = questionsForChapter(
-    ebook.id,
+    localEbook.id,
     chapter.id,
     chapter.questions,
   );
@@ -41,13 +88,16 @@ export default function EbookReaderPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const title = ebook?.title ?? localEbook.title;
+  const description = ebook?.description ?? localEbook.description;
+
   return (
     <main className="min-h-screen bg-stone-50 pb-20">
       <section className="relative overflow-hidden border-b border-stone-200 bg-white">
         <div
           className="absolute inset-0 opacity-80"
           style={{
-            background: `radial-gradient(circle at 80% 10%, ${ebook.color}25, transparent 32%), radial-gradient(circle at 10% 80%, #7aaee820, transparent 28%)`,
+            background: `radial-gradient(circle at 80% 10%, ${localEbook.color}25, transparent 32%), radial-gradient(circle at 10% 80%, #7aaee820, transparent 28%)`,
           }}
         />
         <div className="relative mx-auto max-w-7xl px-6 py-12 md:px-12 md:py-16">
@@ -61,7 +111,7 @@ export default function EbookReaderPage() {
             <div
               className="flex aspect-[4/5] items-center justify-center rounded-[2rem] shadow-sm"
               style={{
-                background: `linear-gradient(145deg, ${ebook.color}, #ffffff)`,
+                background: `linear-gradient(145deg, ${localEbook.color}, #ffffff)`,
               }}
             >
               <div className="text-center">
@@ -76,32 +126,45 @@ export default function EbookReaderPage() {
                   className="mt-2 text-2xl font-semibold text-white"
                   style={{ fontFamily: "var(--font-playfair)" }}
                 >
-                  {ebook.level}
+                  {localEbook.level}
                 </p>
               </div>
             </div>
             <div>
               <span
                 className="inline-flex rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-[0.16em]"
-                style={{ background: ebook.bgLight, color: ebook.textColor }}
+                style={{ background: localEbook.bgLight, color: localEbook.textColor }}
               >
-                {ebook.tag} · Lectura
+                {localEbook.tag} · Lectura
               </span>
               <h1
                 className="mt-5 text-4xl leading-tight text-stone-900 md:text-5xl"
                 style={{ fontFamily: "var(--font-playfair)" }}
               >
-                {ebook.title}
+                {title}
               </h1>
               <p className="mt-4 max-w-2xl text-base leading-7 text-stone-600">
-                {ebook.description}
+                {description}
+              </p>
+              <div className="mt-5 flex flex-wrap items-center gap-3">
+                {hasAccess ? (
+                  <span className="rounded-full bg-[#eaf5e5] px-4 py-2 text-sm font-semibold text-[#3b6d11]">Acceso habilitado</span>
+                ) : (
+                  <button type="button" onClick={purchase} disabled={isPurchasing} className="rounded-full bg-stone-800 px-5 py-2.5 text-sm font-semibold text-white hover:bg-stone-700 disabled:opacity-60">
+                    {isPurchasing ? "Procesando..." : `Comprar por $${(ebook?.price ?? 0).toLocaleString("es-AR")}`}
+                  </button>
+                )}
+                {message && <span role="status" className="text-sm text-stone-600">{message}</span>}
+              </div>
+              <p className="mt-4 inline-flex rounded-xl border border-[#dce8f5] bg-[#f5f8fc] px-4 py-2 text-xs font-medium text-[#527db3]">
+                💳 Pagá con Mercado Pago, Tarjeta de Débito o Crédito
               </p>
               <div className="mt-6 flex flex-wrap items-center gap-3 text-sm text-stone-500">
                 <span className="rounded-xl bg-stone-100 px-3 py-2">
-                  {ebook.chapters.length} capítulos
+                  {localEbook.chapters.length} capítulos
                 </span>
                 <span className="rounded-xl bg-stone-100 px-3 py-2">
-                  {ebook.pages} páginas
+                  {localEbook.pages} páginas
                 </span>
                 <span className="rounded-xl bg-stone-100 px-3 py-2">
                   Preguntas por capítulo
@@ -118,7 +181,7 @@ export default function EbookReaderPage() {
             Contenido
           </p>
           <div className="mt-3 space-y-1">
-            {ebook.chapters.map((item, index) => (
+            {localEbook.chapters.map((item, index) => (
               <button
                 key={item.id}
                 type="button"
@@ -140,10 +203,17 @@ export default function EbookReaderPage() {
 
         <article className="min-w-0">
           <div className="rounded-[1.75rem] border border-stone-200 bg-white px-6 py-8 shadow-sm md:px-12 md:py-12">
-            <div className="mb-8 flex items-center justify-between gap-4 border-b border-stone-100 pb-5">
+            {!hasAccess && (
+              <div className="mb-8 rounded-2xl border border-[#e8d87a]/50 bg-[#fffbea] p-5 text-sm text-stone-600">
+                Comprá el ebook para desbloquear la lectura y sus ejercicios.
+              </div>
+            )}
+            {hasAccess && (
+            <>
+              <div className="mb-8 flex items-center justify-between gap-4 border-b border-stone-100 pb-5">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-stone-400">
-                  Capítulo {chapterIndex + 1} de {ebook.chapters.length}
+                  Capítulo {chapterIndex + 1} de {localEbook.chapters.length}
                 </p>
                 <h2
                   className="mt-2 text-2xl font-semibold text-stone-900 md:text-3xl"
@@ -153,13 +223,15 @@ export default function EbookReaderPage() {
                 </h2>
               </div>
               <BookOpen className="hidden size-7 text-stone-300 sm:block" />
-            </div>
-            <div className="max-w-3xl space-y-4 text-[15px] leading-7 text-stone-600">
-              {renderContent(chapter.content)}
-            </div>
+              </div>
+              <div className="max-w-3xl space-y-4 text-[15px] leading-7 text-stone-600">
+                {renderContent(chapter.content)}
+              </div>
+            </>
+            )}
           </div>
 
-          <section className="mt-8 rounded-[1.75rem] border border-stone-200 bg-white p-6 shadow-sm md:p-10">
+          {hasAccess && <section className="mt-8 rounded-[1.75rem] border border-stone-200 bg-white p-6 shadow-sm md:p-10">
             <div className="flex items-start gap-4">
               <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-[#e8d87a]/30 text-[#927f1c]">
                 <CircleHelp className="size-5" />
@@ -241,7 +313,7 @@ export default function EbookReaderPage() {
                 <Check className="size-4" /> Comprobar respuestas
               </button>
             </div>
-          </section>
+          </section>}
 
           <div className="mt-8 flex items-center justify-between gap-4">
             <button
@@ -254,7 +326,7 @@ export default function EbookReaderPage() {
             </button>
             <button
               type="button"
-              disabled={chapterIndex === ebook.chapters.length - 1}
+              disabled={chapterIndex === localEbook.chapters.length - 1}
               onClick={() => selectChapter(chapterIndex + 1)}
               className="inline-flex items-center gap-2 text-sm font-semibold text-stone-700 transition hover:text-stone-900 disabled:invisible"
             >

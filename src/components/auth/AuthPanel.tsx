@@ -2,7 +2,9 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 import {
   ArrowRight,
   BookOpen,
@@ -28,16 +30,58 @@ export default function AuthPanel({ mode }: { mode: AuthMode }) {
   const [showPassword, setShowPassword] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const router = useRouter();
+  const { login, register, user, isLoading } = useAuth();
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  useEffect(() => {
+    if (isLoading || !user) return;
+    const teacher = user.roles.some(
+      (role) => role === "ROLE_TEACHER" || role === "TEACHER",
+    );
+    router.replace(teacher ? "/admin" : "/dashboard");
+  }, [isLoading, router, user]);
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsSending(true);
     setSubmitted(false);
+    setErrorMessage(null);
 
-    window.setTimeout(() => {
+    const formData = new FormData(event.currentTarget);
+    const username = String(formData.get("email") ?? "").trim();
+    const password = String(formData.get("password") ?? "");
+
+    try {
+      if (isRegister) {
+        const fullName = String(formData.get("fullName") ?? "").trim();
+        const dni = String(formData.get("dni") ?? "").trim();
+        await register({
+          username,
+          password,
+          fullName,
+          dni,
+        });
+      } else {
+        await login(username, password);
+      }
+
       setIsSending(false);
       setSubmitted(true);
-    }, 650);
+      if (user) {
+        const teacher = user.roles.some(
+          (role) => role === "ROLE_TEACHER" || role === "TEACHER",
+        );
+        router.push(teacher ? "/admin" : "/dashboard");
+      }
+    } catch (error) {
+      setIsSending(false);
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "No pudimos conectar con el servidor. Intentá nuevamente.",
+      );
+    }
   };
 
   return (
@@ -165,28 +209,33 @@ export default function AuthPanel({ mode }: { mode: AuthMode }) {
 
             <form className="space-y-4" onSubmit={handleSubmit}>
               {isRegister && (
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <label className="space-y-2 text-sm font-medium text-stone-700">
-                    Nombre
+                <div className="space-y-4">
+                  <label className="block space-y-2 text-sm font-medium text-stone-700">
+                    Nombre completo
                     <span className="relative block">
                       <UserRound className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-stone-400" />
                       <input
                         required
-                        name="firstName"
+                        name="fullName"
                         type="text"
-                        placeholder="Tu nombre"
+                        placeholder="Tu nombre y apellido"
                         className="h-12 w-full rounded-xl border border-stone-200 bg-[#fffdfa] pl-10 pr-3 text-sm text-stone-800 outline-none transition focus:border-[#7aaee8] focus:ring-4 focus:ring-[#7aaee8]/10"
                       />
                     </span>
                   </label>
-                  <label className="space-y-2 text-sm font-medium text-stone-700">
-                    Apellido
+                  <label className="block space-y-2 text-sm font-medium text-stone-700">
+                    DNI (para facturación ARCA)
                     <input
                       required
-                      name="lastName"
+                      name="dni"
                       type="text"
-                      placeholder="Tu apellido"
-                      className="mt-2 h-12 w-full rounded-xl border border-stone-200 bg-[#fffdfa] px-3 text-sm text-stone-800 outline-none transition focus:border-[#7aaee8] focus:ring-4 focus:ring-[#7aaee8]/10"
+                      inputMode="numeric"
+                      pattern="[0-9]{7,9}"
+                      minLength={7}
+                      maxLength={9}
+                      placeholder="Solo números"
+                      title="Ingresá entre 7 y 9 dígitos numéricos"
+                      className="h-12 w-full rounded-xl border border-stone-200 bg-[#fffdfa] px-3 text-sm text-stone-800 outline-none transition focus:border-[#7aaee8] focus:ring-4 focus:ring-[#7aaee8]/10"
                     />
                   </label>
                 </div>
@@ -285,6 +334,14 @@ export default function AuthPanel({ mode }: { mode: AuthMode }) {
                   {isRegister
                     ? "¡Listo! Tu cuenta está preparada para empezar."
                     : "¡Bienvenido de nuevo! Tu aula te está esperando."}
+                </p>
+              )}
+              {errorMessage && (
+                <p
+                  role="alert"
+                  className="rounded-xl border border-[#e8847a]/30 bg-[#fff0ed] px-4 py-3 text-center text-xs font-medium text-[#a34d45]"
+                >
+                  {errorMessage}
                 </p>
               )}
             </form>
